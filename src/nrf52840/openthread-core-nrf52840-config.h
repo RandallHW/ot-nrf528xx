@@ -335,4 +335,8 @@
 _Pragma("diag_suppress=111") _Pragma("diag_suppress=128")
 #endif
 
+#ifndef OPENTHREAD_CONFIG_ENABLE_AUTO_START_SUPPORT
+#define OPENTHREAD_CONFIG_ENABLE_AUTO_START_SUPPORT 1
+#endif
+
 #endif // OPENTHREAD_CORE_NRF52840_CONFIG_H_
