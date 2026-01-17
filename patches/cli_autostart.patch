@@ -1,8 +1,8 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..9134803c1 100644
+index 2ede597cd..a483d65aa 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -47,6 +47,10 @@
+@@ -47,6 +47,11 @@
  
  #include "lib/platform/reset_util.h"
  
@@ -14,31 +14,25 @@ index 2ede597cd..9134803c1 100644
  /**
   * Initializes the CLI app.
   *
-@@ -137,7 +141,7 @@ pseudo_reset:
+@@ -137,6 +142,7 @@ pseudo_reset:
      instance = otInstanceInitSingle();
  #endif
      assert(instance);
--
-+	bool autoStarted = false;
++    bool autoStarted = false;
+ 
      otAppCliInit(instance);
  
- #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-@@ -150,9 +154,15 @@ pseudo_reset:
+@@ -150,6 +156,13 @@ pseudo_reset:
  
      while (!otSysPseudoResetWasRequested())
      {
--        otTaskletsProcess(instance);
--        otSysProcessDrivers(instance);
--    }
-+		if (!autoStarted && otDatasetIsCommissioned(instance))
-+		{
-+			otIp6SetEnabled(instance, true);
-+			otThreadSetEnabled(instance, true);
-+			autoStarted = true;
-+		}
-+    otTaskletsProcess(instance);
-+    otSysProcessDrivers(instance);
-+}
- 
-     otInstanceFinalize(instance);
- #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
++        if (!autoStarted && otDatasetIsCommissioned(instance))
++        {
++            otIp6SetEnabled(instance, true);
++            otThreadSetEnabled(instance, true);
++            autoStarted = true;
++        }
++
+         otTaskletsProcess(instance);
+         otSysProcessDrivers(instance);
+     }
