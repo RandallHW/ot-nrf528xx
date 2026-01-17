@@ -1,41 +1,148 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..bb6264f83 100644
+index 2ede597cd..7e4b208dc 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -47,6 +47,12 @@
+@@ -26,7 +26,9 @@
+  *  POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#include <assert.h>
++
++include <assert.h>
++
+ #ifdef __linux__
+ #include <signal.h>
+ #include <sys/prctl.h>
+@@ -47,6 +49,15 @@
  
  #include "lib/platform/reset_util.h"
  
 +#include <openthread/dataset.h>
 +#include <openthread/ip6.h>
 +#include <openthread/thread.h>
++
 +#include <stdbool.h>
++#include <stdarg.h>
++#include <stdio.h> // Optional: used for printf in the state change callback
 +#include <openthread/config.h>
 +
  /**
   * Initializes the CLI app.
   *
-@@ -137,6 +143,7 @@ pseudo_reset:
-     instance = otInstanceInitSingle();
+@@ -56,7 +67,6 @@ extern void otAppCliInit(otInstance *aInstance);
+ 
+ #if OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
+ OT_TOOL_WEAK void *otPlatCAlloc(size_t aNum, size_t aSize) { return calloc(aNum, aSize); }
+-
+ OT_TOOL_WEAK void otPlatFree(void *aPtr) { free(aPtr); }
+ #endif
+ 
+@@ -86,13 +96,13 @@ static const otCliCommand kCommands[] = {
+      * It can be used either as an allow list or a deny list. Once the filter is cleared, the first `nodeidfilter allow`
+      * or `nodeidfilter deny` will determine whether it is set up as an allow or deny list. Subsequent calls should
+      * use the same sub-command to add new node IDs, e.g., if we first call `nodeidfilter allow` (which sets the filter
+-     * up  as an allow list), a subsequent `nodeidfilter deny` will result in `InvalidState` error.
++     * up as an allow list), a subsequent `nodeidfilter deny` will result in `InvalidState` error.
+      *
+      * The usage of the command `nodeidfilter`:
+-     *     - `nodeidfilter deny <nodeid>` :  It denies the connection to a specified node (use as deny-list).
+-     *     - `nodeidfilter allow <nodeid> :  It allows the connection to a specified node (use as allow-list).
+-     *     - `nodeidfilter clear`         :  It restores the filter state to default.
+-     *     - `nodeidfilter`               :  Outputs filter mode (allow-list or deny-list) and filtered node IDs.
++     *   - `nodeidfilter deny <nodeid>` : Deny connection to specified node (deny-list).
++     *   - `nodeidfilter allow <nodeid>`: Allow connection to specified node (allow-list).
++     *   - `nodeidfilter clear`         : Restore filter state to default.
++     *   - `nodeidfilter`               : Print filter mode and filtered node IDs.
+      */
+     {"nodeidfilter", ProcessNodeIdFilter},
+ #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
+@@ -102,13 +112,26 @@ static const otCliCommand kCommands[] = {
+ };
+ #endif // OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+ 
++/* -------- Optional: simple role-change logger (debug aid) -------- */
++static void HandleStateChanged(otChangedFlags flags, void *ctx)
++{
++    if (flags & OT_CHANGED_THREAD_ROLE)
++    {
++        otInstance  *ins  = (otInstance *)ctx;
++        otDeviceRole role = otThreadGetDeviceRole(ins);
++        // Roles: 0=disabled, 1=detached, 2=child, 3=router, 4=leader
++        // Use printf if your platform routes stdout; otherwise swap to ot logging.
++        printf("OT role now: %d\n", (int)role);
++    }
++}
++/* ----------------------------------------------------------------- */
++
+ int main(int argc, char *argv[])
+ {
+     otInstance *instance;
+ 
+ #ifdef __linux__
+-    // Ensure we terminate this process if the
+-    // parent process dies.
++    // Ensure we terminate this process if the parent process dies.
+     prctl(PR_SET_PDEATHSIG, SIGHUP);
+ #endif
+ 
+@@ -124,10 +147,10 @@ pseudo_reset:
+     otSysInit(argc, argv);
+ 
+ #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+-    // Call to query the buffer size
++    // Query buffer size
+     (void)otInstanceInit(NULL, &otInstanceBufferLength);
+ 
+-    // Call to allocate the buffer
++    // Allocate buffer
+     otInstanceBuffer = (uint8_t *)malloc(otInstanceBufferLength);
+     assert(otInstanceBuffer);
+ 
+@@ -138,6 +161,7 @@ pseudo_reset:
  #endif
      assert(instance);
-+    bool autoStarted = false;
  
++    // Initialize CLI frontend
      otAppCliInit(instance);
  
-@@ -150,6 +157,15 @@ pseudo_reset:
+ #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+@@ -148,6 +172,30 @@ pseudo_reset:
+     IgnoreError(otPlatLogCrashDump());
+ #endif
  
++#if OPENTHREAD_CONFIG_IP6_ENABLE && OPENTHREAD_CONFIG_THREAD_ENABLE
++    // --- START THREAD UNCONDITIONALLY AT BOOT ---
++    // (Equivalent to typing "ifconfig up" then "thread start" in the CLI)
++    {
++        otError err;
++
++        err = otIp6SetEnabled(instance, true);
++        if (err != OT_ERROR_NONE)
++        {
++            // Optional: replace with ot logging if desired
++            printf("otIp6SetEnabled() failed: %d\n", err);
++        }
++
++        err = otThreadSetEnabled(instance, true);
++        if (err != OT_ERROR_NONE)
++        {
++            printf("otThreadSetEnabled() failed: %d\n", err);
++        }
++    }
++
++    // Optional: watch role transitions
++    otSetStateChangedCallback(instance, HandleStateChanged, instance);
++#endif
++
      while (!otSysPseudoResetWasRequested())
      {
-+	#if OPENTHREAD_CONFIG_IP6_ENABLE && OPENTHREAD_CONFIG_THREAD_ENABLE
-+        if (!autoStarted && otDatasetIsCommissioned(instance))
-+        {
-+            otIp6SetEnabled(instance, true);
-+            otThreadSetEnabled(instance, true);
-+            autoStarted = true;
-+        }
-+    #endif
-+
          otTaskletsProcess(instance);
-         otSysProcessDrivers(instance);
-     }
+@@ -161,6 +209,8 @@ pseudo_reset:
+ 
+     goto pseudo_reset;
+ 
++    // Not reached
++    // (The pseudo reset loop above restarts the instance without process exit.)
+     return 0;
+ }
+ 
