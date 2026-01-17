@@ -1,8 +1,8 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..590d97f7f 100644
+index 2ede597cd..bb16b3ec0 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -13,20 +13,15 @@
+@@ -13,20 +13,13 @@
   *     names of its contributors may be used to endorse or promote products
   *     derived from this software without specific prior written permission.
   *
@@ -22,14 +22,12 @@ index 2ede597cd..590d97f7f 100644
 + *  first time via serial connection to the cli.
   */
  
-+
-+
  #include <assert.h>
 +
  #ifdef __linux__
  #include <signal.h>
  #include <sys/prctl.h>
-@@ -44,19 +39,33 @@
+@@ -44,19 +37,36 @@
  #include "openthread-system.h"
  #include "cli/cli_config.h"
  #include "common/code_utils.hpp"
@@ -49,7 +47,8 @@ index 2ede597cd..590d97f7f 100644
 +#include <stdarg.h>
 +#include <stdio.h>
 +
-+// ---- OPTIONAL: role-change logger so we can see attach flow ----
++/* ---------- Optional: simple role-change logger (FTD/MTD only) ---------- */
++#if OPENTHREAD_FTD || OPENTHREAD_MTD
 +static void HandleStateChanged(otChangedFlags flags, void *ctx)
 +{
 +    if (flags & OT_CHANGED_THREAD_ROLE)
@@ -60,8 +59,10 @@ index 2ede597cd..590d97f7f 100644
 +        printf("[BOOT] OT role now: %d\n", (int)role);
 +    }
 +}
++#endif
++/* ------------------------------------------------------------------------ */
 +
-+// CLI app init provided by OpenThread
++/* Provided by OpenThread CLI app */
  extern void otAppCliInit(otInstance *aInstance);
  
  #if OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
@@ -70,14 +71,14 @@ index 2ede597cd..590d97f7f 100644
  OT_TOOL_WEAK void otPlatFree(void *aPtr) { free(aPtr); }
  #endif
  
-@@ -66,52 +75,28 @@ static otError ProcessExit(void *aContext, uint8_t aArgsLength, char *aArgs[])
+@@ -66,52 +76,25 @@ static otError ProcessExit(void *aContext, uint8_t aArgsLength, char *aArgs[])
      OT_UNUSED_VARIABLE(aContext);
      OT_UNUSED_VARIABLE(aArgsLength);
      OT_UNUSED_VARIABLE(aArgs);
 -
      exit(EXIT_SUCCESS);
  }
--
+ 
 -#if OPENTHREAD_EXAMPLES_SIMULATION
 -extern otError ProcessNodeIdFilter(void *aContext, uint8_t aArgsLength, char *aArgs[]);
 -#if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
@@ -109,7 +110,7 @@ index 2ede597cd..590d97f7f 100644
 -#endif
  };
 -#endif // OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-+#endif
++#endif // POSIX guard
  
  int main(int argc, char *argv[])
  {
@@ -118,20 +119,16 @@ index 2ede597cd..590d97f7f 100644
  #ifdef __linux__
 -    // Ensure we terminate this process if the
 -    // parent process dies.
-+    // Ensure we terminate if parent dies (posix sim case)
      prctl(PR_SET_PDEATHSIG, SIGHUP);
  #endif
  
-+    // Helpful: identify the exact build that is running
-+#ifdef OPENTHREAD_PACKAGE_NAME
-+    printf("\n[BOOT] OpenThread: %s\n", OPENTHREAD_PACKAGE_NAME);
-+#endif
-+    printf("[BOOT] Built: %s %s\n", __DATE__, __TIME__);
++    // Build banner helps verify you flashed the right image
++    printf("\n[BOOT] Built: %s %s\n", __DATE__, __TIME__);
 +
      OT_SETUP_RESET_JUMP(argv);
  
  #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
-@@ -124,20 +109,16 @@ pseudo_reset:
+@@ -124,20 +107,16 @@ pseudo_reset:
      otSysInit(argc, argv);
  
  #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
@@ -153,11 +150,12 @@ index 2ede597cd..590d97f7f 100644
      otAppCliInit(instance);
  
  #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-@@ -148,6 +129,21 @@ pseudo_reset:
+@@ -148,6 +127,24 @@ pseudo_reset:
      IgnoreError(otPlatLogCrashDump());
  #endif
  
-+    // ---- UNCONDITIONAL START (no preprocessor guards) ----
++/* -------------------- UNCONDITIONAL START (FTD/MTD only) -------------------- */
++#if OPENTHREAD_FTD || OPENTHREAD_MTD
 +    {
 +        otError err;
 +        printf("[BOOT] Calling otIp6SetEnabled(true)...\n");
@@ -171,11 +169,13 @@ index 2ede597cd..590d97f7f 100644
 +        // Watch state transitions
 +        otSetStateChangedCallback(instance, HandleStateChanged, instance);
 +    }
++#endif
++/* --------------------------------------------------------------------------- */
 +
      while (!otSysPseudoResetWasRequested())
      {
          otTaskletsProcess(instance);
-@@ -168,9 +164,9 @@ pseudo_reset:
+@@ -168,9 +165,10 @@ pseudo_reset:
  void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
  {
      va_list ap;
@@ -185,4 +185,5 @@ index 2ede597cd..590d97f7f 100644
      va_end(ap);
  }
  #endif
++
 +
