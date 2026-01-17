@@ -29,10 +29,19 @@
 
 set -euxo pipefail
 
-# Run upstream bootstrap (toolchain, submodules, etc.)
-"$(dirname "$0")"/../openthread/script/bootstrap
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Apply local patch: auto-start Thread on boot if commissioned
-# (Safe to run repeatedly; will no-op if already applied)
-git -C "$(dirname "$0")/../openthread" apply --whitespace=nowarn "$(dirname "$0")/../patches/cli_autostart.patch" 
+echo "SCRIPT_DIR=$SCRIPT_DIR"
+echo "ROOT_DIR=$ROOT_DIR"
+pwd
+ls -la "$ROOT_DIR"
+ls -la "$ROOT_DIR/patches"
+ls -la "$ROOT_DIR/patches/cli_autostart.patch"
+
+# Run upstream bootstrap (toolchain, submodules, etc.)
+"$ROOT_DIR/openthread/script/bootstrap"
+
+# Apply local patch (must exist)
+git -C "$ROOT_DIR/openthread" apply --whitespace=nowarn "$ROOT_DIR/patches/cli_autostart.patch"
 #|| true
