@@ -29,9 +29,7 @@
 
 set -euxo pipefail
 
-OT_CMAKE_NINJA_TARGET=(ot-cli-ftd)
-# Below line commented out by RW, it used to be appended to the above.
-#${OT_CMAKE_NINJA_TARGET:-}
+OT_CMAKE_NINJA_TARGET=${OT_CMAKE_NINJA_TARGET:-}
 
 NRF_PLATFORMS=(nrf52811 nrf52833 nrf52840)
 readonly NRF_PLATFORMS
