@@ -1,8 +1,8 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..a483d65aa 100644
+index 2ede597cd..bb6264f83 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -47,6 +47,11 @@
+@@ -47,6 +47,12 @@
  
  #include "lib/platform/reset_util.h"
  
@@ -10,11 +10,12 @@ index 2ede597cd..a483d65aa 100644
 +#include <openthread/ip6.h>
 +#include <openthread/thread.h>
 +#include <stdbool.h>
++#include <openthread/config.h>
 +
  /**
   * Initializes the CLI app.
   *
-@@ -137,6 +142,7 @@ pseudo_reset:
+@@ -137,6 +143,7 @@ pseudo_reset:
      instance = otInstanceInitSingle();
  #endif
      assert(instance);
@@ -22,16 +23,18 @@ index 2ede597cd..a483d65aa 100644
  
      otAppCliInit(instance);
  
-@@ -150,6 +156,13 @@ pseudo_reset:
+@@ -150,6 +157,15 @@ pseudo_reset:
  
      while (!otSysPseudoResetWasRequested())
      {
++	#if OPENTHREAD_CONFIG_IP6_ENABLE && OPENTHREAD_CONFIG_THREAD_ENABLE
 +        if (!autoStarted && otDatasetIsCommissioned(instance))
 +        {
 +            otIp6SetEnabled(instance, true);
 +            otThreadSetEnabled(instance, true);
 +            autoStarted = true;
 +        }
++    #endif
 +
          otTaskletsProcess(instance);
          otSysProcessDrivers(instance);
