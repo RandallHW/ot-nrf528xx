@@ -1,5 +1,5 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..58ce92a51 100644
+index 2ede597cd..9134803c1 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
 @@ -47,6 +47,10 @@
@@ -13,15 +13,31 @@ index 2ede597cd..58ce92a51 100644
  /**
   * Initializes the CLI app.
   *
-@@ -138,6 +142,11 @@ pseudo_reset:
+@@ -137,7 +141,7 @@ pseudo_reset:
+     instance = otInstanceInitSingle();
  #endif
      assert(instance);
- 
-+if (otDatasetIsCommissioned(instance))
-+{
-+    otIp6SetEnabled(instance, true);
-+    otThreadSetEnabled(instance, true);
-+}
+-
++	bool autoStarted = false;
      otAppCliInit(instance);
  
  #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+@@ -150,9 +154,15 @@ pseudo_reset:
+ 
+     while (!otSysPseudoResetWasRequested())
+     {
+-        otTaskletsProcess(instance);
+-        otSysProcessDrivers(instance);
+-    }
++		if (!autoStarted && otDatasetIsCommissioned(instance))
++		{
++			otIp6SetEnabled(instance, true);
++			otThreadSetEnabled(instance, true);
++			autoStarted = true;
++		}
++    otTaskletsProcess(instance);
++    otSysProcessDrivers(instance);
++}
+ 
+     otInstanceFinalize(instance);
+ #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
