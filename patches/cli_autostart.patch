@@ -1,34 +1,68 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..bd90080b5 100644
+index 2ede597cd..590d97f7f 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -26,7 +26,9 @@
-  *  POSSIBILITY OF SUCH DAMAGE.
+@@ -13,20 +13,15 @@
+  *     names of its contributors may be used to endorse or promote products
+  *     derived from this software without specific prior written permission.
+  *
+- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+- *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- *  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+- *  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+- *  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+- *  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+- *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+- *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+- *  POSSIBILITY OF SUCH DAMAGE.
++ *  This is Randy's autostart version - trying to get the device to start thread 
++ *  automagically if it is commissioned to the thread network - which is done the
++ *  first time via serial connection to the cli.
   */
  
++
 +
  #include <assert.h>
 +
  #ifdef __linux__
  #include <signal.h>
  #include <sys/prctl.h>
-@@ -47,6 +49,15 @@
- 
+@@ -44,19 +39,33 @@
+ #include "openthread-system.h"
+ #include "cli/cli_config.h"
+ #include "common/code_utils.hpp"
+-
  #include "lib/platform/reset_util.h"
  
+-/**
+- * Initializes the CLI app.
+- *
+- * @param[in]  aInstance  The OpenThread instance structure.
+- */
 +#include <openthread/dataset.h>
 +#include <openthread/ip6.h>
 +#include <openthread/thread.h>
 +
 +#include <stdbool.h>
 +#include <stdarg.h>
-+#include <stdio.h> // Optional: used for printf in the state change callback
-+#include <openthread/config.h>
++#include <stdio.h>
 +
- /**
-  * Initializes the CLI app.
-  *
-@@ -56,7 +67,6 @@ extern void otAppCliInit(otInstance *aInstance);
++// ---- OPTIONAL: role-change logger so we can see attach flow ----
++static void HandleStateChanged(otChangedFlags flags, void *ctx)
++{
++    if (flags & OT_CHANGED_THREAD_ROLE)
++    {
++        otInstance  *ins  = (otInstance *)ctx;
++        otDeviceRole role = otThreadGetDeviceRole(ins);
++        // 0=disabled, 1=detached, 2=child, 3=router, 4=leader
++        printf("[BOOT] OT role now: %d\n", (int)role);
++    }
++}
++
++// CLI app init provided by OpenThread
+ extern void otAppCliInit(otInstance *aInstance);
  
  #if OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
  OT_TOOL_WEAK void *otPlatCAlloc(size_t aNum, size_t aSize) { return calloc(aNum, aSize); }
@@ -36,43 +70,47 @@ index 2ede597cd..bd90080b5 100644
  OT_TOOL_WEAK void otPlatFree(void *aPtr) { free(aPtr); }
  #endif
  
-@@ -86,13 +96,13 @@ static const otCliCommand kCommands[] = {
-      * It can be used either as an allow list or a deny list. Once the filter is cleared, the first `nodeidfilter allow`
-      * or `nodeidfilter deny` will determine whether it is set up as an allow or deny list. Subsequent calls should
-      * use the same sub-command to add new node IDs, e.g., if we first call `nodeidfilter allow` (which sets the filter
+@@ -66,52 +75,28 @@ static otError ProcessExit(void *aContext, uint8_t aArgsLength, char *aArgs[])
+     OT_UNUSED_VARIABLE(aContext);
+     OT_UNUSED_VARIABLE(aArgsLength);
+     OT_UNUSED_VARIABLE(aArgs);
+-
+     exit(EXIT_SUCCESS);
+ }
+-
+-#if OPENTHREAD_EXAMPLES_SIMULATION
+-extern otError ProcessNodeIdFilter(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+-#if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
+-extern otError ProcessTrelTest(void *aContext, uint8_t aArgsLength, char *aArgs[]);
+-#endif
+-#endif
+-
+ static const otCliCommand kCommands[] = {
+     {"exit", ProcessExit},
+-#if OPENTHREAD_EXAMPLES_SIMULATION
+-    /*
+-     * The CLI command `nodeidfilter` only works for simulation in real time.
+-     *
+-     * It can be used either as an allow list or a deny list. Once the filter is cleared, the first `nodeidfilter allow`
+-     * or `nodeidfilter deny` will determine whether it is set up as an allow or deny list. Subsequent calls should
+-     * use the same sub-command to add new node IDs, e.g., if we first call `nodeidfilter allow` (which sets the filter
 -     * up  as an allow list), a subsequent `nodeidfilter deny` will result in `InvalidState` error.
-+     * up as an allow list), a subsequent `nodeidfilter deny` will result in `InvalidState` error.
-      *
-      * The usage of the command `nodeidfilter`:
+-     *
+-     * The usage of the command `nodeidfilter`:
 -     *     - `nodeidfilter deny <nodeid>` :  It denies the connection to a specified node (use as deny-list).
 -     *     - `nodeidfilter allow <nodeid> :  It allows the connection to a specified node (use as allow-list).
 -     *     - `nodeidfilter clear`         :  It restores the filter state to default.
 -     *     - `nodeidfilter`               :  Outputs filter mode (allow-list or deny-list) and filtered node IDs.
-+     *   - `nodeidfilter deny <nodeid>` : Deny connection to specified node (deny-list).
-+     *   - `nodeidfilter allow <nodeid>`: Allow connection to specified node (allow-list).
-+     *   - `nodeidfilter clear`         : Restore filter state to default.
-+     *   - `nodeidfilter`               : Print filter mode and filtered node IDs.
-      */
-     {"nodeidfilter", ProcessNodeIdFilter},
- #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
-@@ -102,13 +112,26 @@ static const otCliCommand kCommands[] = {
+-     */
+-    {"nodeidfilter", ProcessNodeIdFilter},
+-#if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
+-    {"treltest", ProcessTrelTest},
+-#endif
+-#endif
  };
- #endif // OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+-#endif // OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
++#endif
  
-+/* -------- Optional: simple role-change logger (debug aid) -------- */
-+static void HandleStateChanged(otChangedFlags flags, void *ctx)
-+{
-+    if (flags & OT_CHANGED_THREAD_ROLE)
-+    {
-+        otInstance  *ins  = (otInstance *)ctx;
-+        otDeviceRole role = otThreadGetDeviceRole(ins);
-+        // Roles: 0=disabled, 1=detached, 2=child, 3=router, 4=leader
-+        // Use printf if your platform routes stdout; otherwise swap to ot logging.
-+        printf("OT role now: %d\n", (int)role);
-+    }
-+}
-+/* ----------------------------------------------------------------- */
-+
  int main(int argc, char *argv[])
  {
      otInstance *instance;
@@ -80,24 +118,34 @@ index 2ede597cd..bd90080b5 100644
  #ifdef __linux__
 -    // Ensure we terminate this process if the
 -    // parent process dies.
-+    // Ensure we terminate this process if the parent process dies.
++    // Ensure we terminate if parent dies (posix sim case)
      prctl(PR_SET_PDEATHSIG, SIGHUP);
  #endif
  
-@@ -124,10 +147,10 @@ pseudo_reset:
++    // Helpful: identify the exact build that is running
++#ifdef OPENTHREAD_PACKAGE_NAME
++    printf("\n[BOOT] OpenThread: %s\n", OPENTHREAD_PACKAGE_NAME);
++#endif
++    printf("[BOOT] Built: %s %s\n", __DATE__, __TIME__);
++
+     OT_SETUP_RESET_JUMP(argv);
+ 
+ #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+@@ -124,20 +109,16 @@ pseudo_reset:
      otSysInit(argc, argv);
  
  #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
 -    // Call to query the buffer size
-+    // Query buffer size
      (void)otInstanceInit(NULL, &otInstanceBufferLength);
- 
+-
 -    // Call to allocate the buffer
-+    // Allocate buffer
      otInstanceBuffer = (uint8_t *)malloc(otInstanceBufferLength);
      assert(otInstanceBuffer);
- 
-@@ -138,6 +161,7 @@ pseudo_reset:
+-
+-    // Initialize OpenThread with the buffer
+     instance = otInstanceInit(otInstanceBuffer, &otInstanceBufferLength);
+ #else
+     instance = otInstanceInitSingle();
  #endif
      assert(instance);
  
@@ -105,43 +153,36 @@ index 2ede597cd..bd90080b5 100644
      otAppCliInit(instance);
  
  #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-@@ -148,6 +172,30 @@ pseudo_reset:
+@@ -148,6 +129,21 @@ pseudo_reset:
      IgnoreError(otPlatLogCrashDump());
  #endif
  
-+#if OPENTHREAD_CONFIG_IP6_ENABLE && OPENTHREAD_CONFIG_THREAD_ENABLE
-+    // --- START THREAD UNCONDITIONALLY AT BOOT ---
-+    // (Equivalent to typing "ifconfig up" then "thread start" in the CLI)
++    // ---- UNCONDITIONAL START (no preprocessor guards) ----
 +    {
 +        otError err;
-+
++        printf("[BOOT] Calling otIp6SetEnabled(true)...\n");
 +        err = otIp6SetEnabled(instance, true);
-+        if (err != OT_ERROR_NONE)
-+        {
-+            // Optional: replace with ot logging if desired
-+            printf("otIp6SetEnabled() failed: %d\n", err);
-+        }
++        printf("[BOOT] otIp6SetEnabled => %d\n", (int)err);
 +
++        printf("[BOOT] Calling otThreadSetEnabled(true)...\n");
 +        err = otThreadSetEnabled(instance, true);
-+        if (err != OT_ERROR_NONE)
-+        {
-+            printf("otThreadSetEnabled() failed: %d\n", err);
-+        }
-+    }
++        printf("[BOOT] otThreadSetEnabled => %d\n", (int)err);
 +
-+    // Optional: watch role transitions
-+    otSetStateChangedCallback(instance, HandleStateChanged, instance);
-+#endif
++        // Watch state transitions
++        otSetStateChangedCallback(instance, HandleStateChanged, instance);
++    }
 +
      while (!otSysPseudoResetWasRequested())
      {
          otTaskletsProcess(instance);
-@@ -161,6 +209,8 @@ pseudo_reset:
- 
-     goto pseudo_reset;
- 
-+    // Not reached
-+    // (The pseudo reset loop above restarts the instance without process exit.)
-     return 0;
+@@ -168,9 +164,9 @@ pseudo_reset:
+ void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+ {
+     va_list ap;
+-
+     va_start(ap, aFormat);
+     otCliPlatLogv(aLogLevel, aLogRegion, aFormat, ap);
+     va_end(ap);
  }
- 
+ #endif
++
