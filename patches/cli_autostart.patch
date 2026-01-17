@@ -9,6 +9,7 @@ index 2ede597cd..9134803c1 100644
 +#include <openthread/dataset.h>
 +#include <openthread/ip6.h>
 +#include <openthread/thread.h>
++#include <stdbool.h>
 +
  /**
   * Initializes the CLI app.
