@@ -1,0 +1,27 @@
+diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
+index 2ede597cd..58ce92a51 100644
+--- a/examples/apps/cli/main.c
++++ b/examples/apps/cli/main.c
+@@ -47,6 +47,10 @@
+ 
+ #include "lib/platform/reset_util.h"
+ 
++#include <openthread/dataset.h>
++#include <openthread/ip6.h>
++#include <openthread/thread.h>
++
+ /**
+  * Initializes the CLI app.
+  *
+@@ -138,6 +142,11 @@ pseudo_reset:
+ #endif
+     assert(instance);
+ 
++if (otDatasetIsCommissioned(instance))
++{
++    otIp6SetEnabled(instance, true);
++    otThreadSetEnabled(instance, true);
++}
+     otAppCliInit(instance);
+ 
+ #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
