@@ -1,8 +1,8 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..eae940831 100644
+index 2ede597cd..1bc0eba1b 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
-@@ -13,20 +13,13 @@
+@@ -13,20 +13,14 @@
   *     names of its contributors may be used to endorse or promote products
   *     derived from this software without specific prior written permission.
   *
@@ -22,21 +22,13 @@ index 2ede597cd..eae940831 100644
 + *  first time via serial connection to the cli.
   */
  
++
  #include <assert.h>
 +
  #ifdef __linux__
  #include <signal.h>
  #include <sys/prctl.h>
-@@ -35,7 +28,7 @@
- #include <openthread-core-config.h>
- #include <openthread/config.h>
- 
--#include <openthread/cli.h>
-+#include <openthread/cli.h>            // <-- for otCliOutputFormat
- #include <openthread/diag.h>
- #include <openthread/tasklet.h>
- #include <openthread/platform/logging.h>
-@@ -44,19 +37,34 @@
+@@ -44,19 +38,36 @@
  #include "openthread-system.h"
  #include "cli/cli_config.h"
  #include "common/code_utils.hpp"
@@ -54,8 +46,9 @@ index 2ede597cd..eae940831 100644
 +
 +#include <stdbool.h>
 +#include <stdarg.h>
++#include <stdio.h>
 +
-+/* ---------- Optional: role-change logger (FTD/MTD only) ---------- */
++/* ---------- Optional: simple role-change logger (FTD/MTD only) ---------- */
 +#if OPENTHREAD_FTD || OPENTHREAD_MTD
 +static void HandleStateChanged(otChangedFlags flags, void *ctx)
 +{
@@ -64,12 +57,13 @@ index 2ede597cd..eae940831 100644
 +        otInstance  *ins  = (otInstance *)ctx;
 +        otDeviceRole role = otThreadGetDeviceRole(ins);
 +        // 0=disabled, 1=detached, 2=child, 3=router, 4=leader
-+        otCliOutputFormat("[BOOT] OT role now: %d\r\n", (int)role);
++        printf("[BOOT] OT role now: %d\n", (int)role);
 +    }
 +}
 +#endif
-+/* ---------------------------------------------------------------- */
++/* ------------------------------------------------------------------------ */
 +
++/* Provided by OpenThread CLI app */
  extern void otAppCliInit(otInstance *aInstance);
  
  #if OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
@@ -78,7 +72,7 @@ index 2ede597cd..eae940831 100644
  OT_TOOL_WEAK void otPlatFree(void *aPtr) { free(aPtr); }
  #endif
  
-@@ -66,52 +74,25 @@ static otError ProcessExit(void *aContext, uint8_t aArgsLength, char *aArgs[])
+@@ -66,52 +77,25 @@ static otError ProcessExit(void *aContext, uint8_t aArgsLength, char *aArgs[])
      OT_UNUSED_VARIABLE(aContext);
      OT_UNUSED_VARIABLE(aArgsLength);
      OT_UNUSED_VARIABLE(aArgs);
@@ -130,12 +124,12 @@ index 2ede597cd..eae940831 100644
  #endif
  
 +    // Build banner helps verify you flashed the right image
-+    otCliOutputFormat("\r\n[BOOT] Built: %s %s\r\n", __DATE__, __TIME__);
++    printf("\n[BOOT] Built: %s %s\n", __DATE__, __TIME__);
 +
      OT_SETUP_RESET_JUMP(argv);
  
  #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
-@@ -124,20 +105,16 @@ pseudo_reset:
+@@ -124,20 +108,16 @@ pseudo_reset:
      otSysInit(argc, argv);
  
  #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
@@ -157,7 +151,7 @@ index 2ede597cd..eae940831 100644
      otAppCliInit(instance);
  
  #if OPENTHREAD_POSIX && !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-@@ -148,6 +125,24 @@ pseudo_reset:
+@@ -148,6 +128,24 @@ pseudo_reset:
      IgnoreError(otPlatLogCrashDump());
  #endif
  
@@ -165,15 +159,15 @@ index 2ede597cd..eae940831 100644
 +#if OPENTHREAD_FTD || OPENTHREAD_MTD
 +    {
 +        otError err;
-+        otCliOutputFormat("[BOOT] Calling otIp6SetEnabled(true)...\r\n");
++        printf("[BOOT] Calling otIp6SetEnabled(true)...\n");
 +        err = otIp6SetEnabled(instance, true);
-+        otCliOutputFormat("[BOOT] otIp6SetEnabled => %d\r\n", (int)err);
++        printf("[BOOT] otIp6SetEnabled => %d\n", (int)err);
 +
-+        otCliOutputFormat("[BOOT] Calling otThreadSetEnabled(true)...\r\n");
++        printf("[BOOT] Calling otThreadSetEnabled(true)...\n");
 +        err = otThreadSetEnabled(instance, true);
-+        otCliOutputFormat("[BOOT] otThreadSetEnabled => %d\r\n", (int)err);
++        printf("[BOOT] otThreadSetEnabled => %d\n", (int)err);
 +
-+        // Watch role transitions
++        // Watch state transitions
 +        otSetStateChangedCallback(instance, HandleStateChanged, instance);
 +    }
 +#endif
@@ -182,7 +176,7 @@ index 2ede597cd..eae940831 100644
      while (!otSysPseudoResetWasRequested())
      {
          otTaskletsProcess(instance);
-@@ -168,7 +163,6 @@ pseudo_reset:
+@@ -168,7 +166,6 @@ pseudo_reset:
  void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
  {
      va_list ap;
