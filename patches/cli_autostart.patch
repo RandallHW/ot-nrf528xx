@@ -1,5 +1,5 @@
 diff --git a/examples/apps/cli/main.c b/examples/apps/cli/main.c
-index 2ede597cd..d981444c3 100644
+index 2ede597cd..eae940831 100644
 --- a/examples/apps/cli/main.c
 +++ b/examples/apps/cli/main.c
 @@ -13,20 +13,13 @@
@@ -182,7 +182,7 @@ index 2ede597cd..d981444c3 100644
      while (!otSysPseudoResetWasRequested())
      {
          otTaskletsProcess(instance);
-@@ -168,9 +163,11 @@ pseudo_reset:
+@@ -168,7 +163,6 @@ pseudo_reset:
  void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
  {
      va_list ap;
@@ -190,8 +190,3 @@ index 2ede597cd..d981444c3 100644
      va_start(ap, aFormat);
      otCliPlatLogv(aLogLevel, aLogRegion, aFormat, ap);
      va_end(ap);
- }
- #endif
-+
-+
-+
